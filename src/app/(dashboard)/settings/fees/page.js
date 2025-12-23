@@ -27,8 +27,8 @@ import {
   DeleteOutlined,
   SettingOutlined,
 } from '@ant-design/icons';
-import PageHeader from '@/components.common.PageHeader';
-import { settingsApi } from '@/lib.api';
+import PageHeader from '@/components/common/PageHeader';
+// import { settingsApi } from '@/lib/api';
 
 const { Title, Text } = Typography;
 const { Option } = Select;

@@ -24,8 +24,8 @@ import {
   ClockCircleOutlined,
   DollarOutlined,
 } from '@ant-design/icons';
-import PageHeader from '@/components.common.PageHeader';
-import { transportApi } from '@/lib.api';
+import PageHeader from '@/components/common/PageHeader';
+import { transportApi } from '@/lib/api';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
