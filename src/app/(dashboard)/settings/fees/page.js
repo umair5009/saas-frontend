@@ -489,6 +489,4 @@ export default function FeeSettingsPage() {
       </Form>
     </div>
   );
-}</contents>
-</xai:function_call ><xai:function_call name="write">
-<parameter name="file_path">frontend/src/app/(dashboard)/settings/notifications/page.js
+}

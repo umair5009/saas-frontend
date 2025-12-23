@@ -292,6 +292,4 @@ export default function CreateTransportRoutePage() {
       </Card>
     </div>
   );
-}</contents>
-</xai:function_call ><xai:function_call name="write">
-<parameter name="file_path">frontend/src/app/(dashboard)/transport/assignments/page.js
+}
