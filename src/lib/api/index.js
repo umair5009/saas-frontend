@@ -1,0 +1,16 @@
+export { authApi } from './auth';
+export { dashboardApi } from './dashboard';
+export { studentApi } from './students';
+export { staffApi } from './staff';
+export { feeApi } from './fees';
+export { examApi } from './exams';
+export { attendanceApi } from './attendance';
+export { branchApi } from './branches';
+export { academicApi } from './academic';
+export { libraryApi } from './library';
+export { transportApi } from './transport';
+export { timetableApi } from './timetable';
+export { inventoryApi } from './inventory';
+export { notificationApi } from './notifications';
+export { reportsApi } from './reports';
+export { uploadApi } from './upload';
