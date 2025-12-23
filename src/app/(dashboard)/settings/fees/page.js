@@ -46,30 +46,30 @@ export default function FeeSettingsPage() {
 
   const fetchSettings = async () => {
     setLoading(true);
-    try {
-      const { data } = await settingsApi.getFeeSettings();
-      if (data.success) {
-        setSettings(data.data);
-        form.setFieldsValue(data.data);
-      }
-    } catch (error) {
-      message.error('Failed to fetch fee settings');
-    } finally {
-      setLoading(false);
-    }
+    // try {
+    //   const { data } = await settingsApi.getFeeSettings();
+    //   if (data.success) {
+    //     setSettings(data.data);
+    //     form.setFieldsValue(data.data);
+    //   }
+    // } catch (error) {
+    //   message.error('Failed to fetch fee settings');
+    // } finally {
+    //   setLoading(false);
+    // }
   };
 
   const handleSubmit = async (values) => {
     setSaving(true);
-    try {
-      await settingsApi.updateFeeSettings(values);
-      message.success('Fee settings updated successfully!');
-      fetchSettings();
-    } catch (error) {
-      message.error(error.response?.data?.message || 'Failed to update settings');
-    } finally {
-      setSaving(false);
-    }
+    // try {
+    //   await settingsApi.updateFeeSettings(values);
+    //   message.success('Fee settings updated successfully!');
+    //   fetchSettings();
+    // } catch (error) {
+    //   message.error(error.response?.data?.message || 'Failed to update settings');
+    // } finally {
+    //   setSaving(false);
+    // }
   };
 
   if (loading) {
