@@ -45,30 +45,30 @@ export default function GeneralSettingsPage() {
 
   const fetchSettings = async () => {
     setLoading(true);
-    try {
-      const { data } = await settingsApi.getGeneral();
-      if (data.success) {
-        setSettings(data.data);
-        form.setFieldsValue(data.data);
-      }
-    } catch (error) {
-      message.error('Failed to fetch general settings');
-    } finally {
-      setLoading(false);
-    }
+    // try {
+    //   const data  = await settingsApi.getGeneral();
+    //   if (data.success) {
+    //     setSettings(data.data);
+    //     form.setFieldsValue(data.data);
+    //   }
+    // } catch (error) {
+    //   message.error('Failed to fetch general settings');
+    // } finally {
+    //   setLoading(false);
+    // }
   };
 
   const handleSubmit = async (values) => {
     setSaving(true);
-    try {
-      await settingsApi.updateGeneral(values);
-      message.success('General settings updated successfully!');
-      fetchSettings();
-    } catch (error) {
-      message.error(error.response?.data?.message || 'Failed to update settings');
-    } finally {
-      setSaving(false);
-    }
+    // try {
+    //   await settingsApi.updateGeneral(values);
+    //   message.success('General settings updated successfully!');
+    //   fetchSettings();
+    // } catch (error) {
+    //   message.error(error.response?.data?.message || 'Failed to update settings');
+    // } finally {
+    //   setSaving(false);
+    // }
   };
 
   if (loading) {
