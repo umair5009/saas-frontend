@@ -190,6 +190,17 @@ export default function DashboardPage() {
         </Col>
         <Col xs={24} sm={12} lg={6}>
           <StatCard
+            title="Pending Fees"
+            value={stats.pendingFees}
+            prefix="Rs. "
+            icon={<DollarOutlined style={{ fontSize: 28, color: '#faad14' }} />}
+            trend="up"
+            trendValue={12.5}
+            color="#faad14"
+          />
+        </Col>
+        <Col xs={24} sm={12} lg={6}>
+          <StatCard
             title="Attendance Rate"
             value={stats.attendanceRate}
             suffix="%"
@@ -287,7 +298,7 @@ export default function DashboardPage() {
           <Card title="Today's Attendance" style={{ borderRadius: 12 }} loading={loading}>
             <Row gutter={[16, 16]}>
               <Col span={12}>
-                <Card style={{ background: '#f6ffed', border: '1px solid #b7eb8f', borderRadius: 8 }}>
+                <Card style={{ border: '1px solid #b7eb8f', borderRadius: 8 }}>
                   <Statistic
                     title="Students Present"
                     value={Math.round((stats.totalStudents || 0) * 0.92)}
@@ -298,7 +309,7 @@ export default function DashboardPage() {
                 </Card>
               </Col>
               <Col span={12}>
-                <Card style={{ background: '#e6f7ff', border: '1px solid #91d5ff', borderRadius: 8 }}>
+                <Card style={{ border: '1px solid #91d5ff', borderRadius: 8 }}>
                   <Statistic
                     title="Staff Present"
                     value={Math.round((stats.totalStaff || 0) * 0.98)}

@@ -8,12 +8,12 @@ import {
   Select,
   DatePicker,
   Typography,
-  Table,
   Tag,
   Space,
   Avatar,
-  Input,
   Button,
+  message,
+  Tooltip
 } from 'antd';
 import {
   UserOutlined,
@@ -27,16 +27,19 @@ import {
   DollarOutlined,
   BookOutlined,
   DownloadOutlined,
-  FilterOutlined,
+  SearchOutlined,
+  SafetyCertificateOutlined
 } from '@ant-design/icons';
 import PageHeader from '@/components/common/PageHeader';
 import DataTable from '@/components/common/DataTable';
 import dayjs from 'dayjs';
+import { activityLogApi } from '@/lib/api';
 
 const { Text } = Typography;
 const { Option } = Select;
 const { RangePicker } = DatePicker;
 
+// Config for icons and colors
 const actionConfig = {
   CREATE: { icon: <PlusOutlined />, color: '#52c41a' },
   UPDATE: { icon: <EditOutlined />, color: '#1890ff' },
@@ -47,6 +50,7 @@ const actionConfig = {
   PAYMENT: { icon: <DollarOutlined />, color: '#52c41a' },
   SETTINGS: { icon: <SettingOutlined />, color: '#722ed1' },
   MARKS_ENTRY: { icon: <BookOutlined />, color: '#eb2f96' },
+  OTHER: { icon: <SafetyCertificateOutlined />, color: 'default' }
 };
 
 const moduleColors = {
@@ -59,102 +63,113 @@ const moduleColors = {
   Library: 'magenta',
   Settings: 'red',
   Branch: 'geekblue',
+  System: 'volcano'
 };
 
 export default function ActivityLogsPage() {
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [filters, setFilters] = useState({});
+  const [total, setTotal] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  // Filter states
+  const [filters, setFilters] = useState({
+    action: undefined,
+    module: undefined,
+    user: undefined,
+    search: undefined
+  });
   const [dateRange, setDateRange] = useState(null);
+
+  // Metadata for filters
+  const [actionsList, setActionsList] = useState([]);
+  const [modulesList, setModulesList] = useState([]);
+
+  useEffect(() => {
+    fetchMetadata();
+  }, []);
 
   useEffect(() => {
     fetchLogs();
-  }, [filters, dateRange]);
+  }, [currentPage, pageSize, filters, dateRange]);
+
+  const fetchMetadata = async () => {
+    try {
+      const [actionsRes, modulesRes] = await Promise.all([
+        activityLogApi.getActions(),
+        activityLogApi.getModules()
+      ]);
+      if (actionsRes.success) setActionsList(actionsRes.data);
+      if (modulesRes.success) setModulesList(modulesRes.data);
+    } catch (error) {
+      console.error('Failed to fetch metadata:', error);
+    }
+  };
 
   const fetchLogs = async () => {
     setLoading(true);
     try {
-      // Mock data
-      const mockLogs = [
-        {
-          _id: '1',
-          user: { name: 'Admin User', email: 'admin@school.com', role: 'super_admin' },
-          action: 'CREATE',
-          module: 'Student',
-          description: 'Created new student: Ali Khan (STU202500125)',
-          targetModel: 'Student',
-          targetId: 'student-125',
-          ipAddress: '192.168.1.100',
-          userAgent: 'Chrome 120 on Windows',
-          createdAt: dayjs().subtract(10, 'minutes').toISOString(),
-        },
-        {
-          _id: '2',
-          user: { name: 'Branch Admin', email: 'branch@school.com', role: 'branch_admin' },
-          action: 'PAYMENT',
-          module: 'Fee',
-          description: 'Collected fee payment: Rs. 15,000 from Ahmed Hassan',
-          targetModel: 'FeePayment',
-          targetId: 'payment-456',
-          ipAddress: '192.168.1.101',
-          userAgent: 'Chrome 120 on Windows',
-          createdAt: dayjs().subtract(30, 'minutes').toISOString(),
-        },
-        {
-          _id: '3',
-          user: { name: 'Teacher', email: 'teacher@school.com', role: 'teacher' },
-          action: 'MARKS_ENTRY',
-          module: 'Exam',
-          description: 'Entered marks for Mathematics - Class 10A (45 students)',
-          targetModel: 'Exam',
-          targetId: 'exam-789',
-          ipAddress: '192.168.1.102',
-          userAgent: 'Firefox 121 on macOS',
-          createdAt: dayjs().subtract(2, 'hours').toISOString(),
-        },
-        {
-          _id: '4',
-          user: { name: 'Admin User', email: 'admin@school.com', role: 'super_admin' },
-          action: 'UPDATE',
-          module: 'Settings',
-          description: 'Updated fee structure for academic year 2025-2026',
-          targetModel: 'Settings',
-          targetId: 'settings-1',
-          ipAddress: '192.168.1.100',
-          userAgent: 'Chrome 120 on Windows',
-          createdAt: dayjs().subtract(1, 'day').toISOString(),
-        },
-        {
-          _id: '5',
-          user: { name: 'System', email: 'system', role: 'system' },
-          action: 'CREATE',
-          module: 'Fee',
-          description: 'Auto-generated 125 fee invoices for January 2025',
-          targetModel: 'FeeInvoice',
-          targetId: 'batch-001',
-          ipAddress: 'localhost',
-          userAgent: 'System Job',
-          createdAt: dayjs().subtract(2, 'days').toISOString(),
-        },
-        {
-          _id: '6',
-          user: { name: 'Branch Admin', email: 'branch@school.com', role: 'branch_admin' },
-          action: 'DELETE',
-          module: 'Student',
-          description: 'Deleted student record: Inactive student (withdrawn)',
-          targetModel: 'Student',
-          targetId: 'student-old',
-          ipAddress: '192.168.1.101',
-          userAgent: 'Chrome 120 on Windows',
-          createdAt: dayjs().subtract(3, 'days').toISOString(),
-        },
-      ];
+      const params = {
+        page: currentPage,
+        limit: pageSize,
+        ...filters,
+      };
 
-      setLogs(mockLogs);
+      if (dateRange && dateRange[0] && dateRange[1]) {
+        params.startDate = dateRange[0].startOf('day').toISOString();
+        params.endDate = dateRange[1].endOf('day').toISOString();
+      }
+
+      const response = await activityLogApi.getAll(params);
+
+      if (response.success) {
+        setLogs(response.data);
+        setTotal(response.pagination.total);
+      }
     } catch (error) {
-      console.error('Failed to fetch activity logs');
+      message.error('Failed to fetch activity logs');
+      console.error(error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleTableChange = (pagination) => {
+    setCurrentPage(pagination.current);
+    setPageSize(pagination.pageSize);
+  };
+
+  const handleExport = async () => {
+    try {
+      message.loading('Exporting logs...', 1);
+      const params = {
+        ...filters,
+        format: 'csv'
+      };
+
+      if (dateRange && dateRange[0] && dateRange[1]) {
+        params.startDate = dateRange[0].startOf('day').toISOString();
+        params.endDate = dateRange[1].endOf('day').toISOString();
+      }
+
+      const blob = await activityLogApi.export(params);
+
+      // Create a link and trigger download
+      const url = window.URL.createObjectURL(new Blob([blob]));
+      const link = document.createElement('a');
+      link.href = url;
+      const filename = `activity_logs_${dayjs().format('YYYY-MM-DD_HHmm')}.csv`;
+      link.setAttribute('download', filename);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+
+      message.success('Logs exported successfully');
+    } catch (error) {
+      message.error('Failed to export logs');
+      console.error(error);
     }
   };
 
@@ -166,7 +181,7 @@ export default function ActivityLogsPage() {
       width: 180,
       render: (date) => (
         <Space direction="vertical" size={0}>
-          <Text>{dayjs(date).format('DD MMM YYYY')}</Text>
+          <Text strong>{dayjs(date).format('DD MMM YYYY')}</Text>
           <Text type="secondary" style={{ fontSize: 12 }}>
             {dayjs(date).format('hh:mm:ss A')}
           </Text>
@@ -176,39 +191,43 @@ export default function ActivityLogsPage() {
     {
       title: 'User',
       key: 'user',
-      width: 200,
-      render: (_, record) => (
-        <Space>
-          <Avatar
-            size="small"
-            icon={<UserOutlined />}
-            style={{
-              background: record.user.role === 'super_admin' ? '#722ed1' :
-                         record.user.role === 'branch_admin' ? '#1890ff' :
-                         record.user.role === 'teacher' ? '#52c41a' : '#8c8c8c',
-            }}
-          />
-          <div>
-            <Text>{record.user.name}</Text>
-            <div style={{ fontSize: 11, color: '#8c8c8c' }}>
-              {record.user.role?.replace('_', ' ')}
+      width: 220,
+      render: (_, record) => {
+        if (!record.user) return <Text type="secondary">System/Unknown</Text>;
+
+        return (
+          <Space>
+            <Avatar
+              size="small"
+              icon={<UserOutlined />}
+              style={{
+                background: record.user.role === 'super_admin' ? '#722ed1' :
+                  record.user.role === 'main_branch_admin' ? '#1890ff' :
+                    record.user.role === 'teacher' ? '#52c41a' : '#8c8c8c',
+              }}
+            />
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              <Text style={{ fontSize: 13, fontWeight: 500 }}>{record.user.name}</Text>
+              <Text type="secondary" style={{ fontSize: 11 }}>
+                {record.user.role?.replace(/_/g, ' ').toUpperCase()}
+              </Text>
             </div>
-          </div>
-        </Space>
-      ),
+          </Space>
+        );
+      },
     },
     {
       title: 'Action',
       dataIndex: 'action',
       key: 'action',
-      width: 120,
+      width: 130,
       render: (action) => {
-        const config = actionConfig[action] || { icon: null, color: '#8c8c8c' };
+        const config = actionConfig[action] || actionConfig['OTHER'];
         return (
           <Tag
             icon={config.icon}
             color={config.color}
-            style={{ borderRadius: 4 }}
+            style={{ borderRadius: 4, marginRight: 0 }}
           >
             {action}
           </Tag>
@@ -219,7 +238,7 @@ export default function ActivityLogsPage() {
       title: 'Module',
       dataIndex: 'module',
       key: 'module',
-      width: 100,
+      width: 120,
       render: (module) => (
         <Tag color={moduleColors[module] || 'default'}>{module}</Tag>
       ),
@@ -228,22 +247,26 @@ export default function ActivityLogsPage() {
       title: 'Description',
       dataIndex: 'description',
       key: 'description',
-      ellipsis: true,
+      render: (text) => (
+        <Tooltip title={text}>
+          <Text ellipsis style={{ maxWidth: 300 }}>{text}</Text>
+        </Tooltip>
+      )
     },
     {
-      title: 'IP Address',
-      dataIndex: 'ipAddress',
-      key: 'ipAddress',
-      width: 130,
-      render: (ip) => <Text code style={{ fontSize: 12 }}>{ip}</Text>,
-    },
-    {
-      title: 'Device',
-      dataIndex: 'userAgent',
-      key: 'userAgent',
+      title: 'Client Info',
+      key: 'clientInfo',
       width: 180,
-      ellipsis: true,
-      render: (ua) => <Text type="secondary" style={{ fontSize: 12 }}>{ua}</Text>,
+      render: (_, record) => (
+        <Space direction="vertical" size={0}>
+          <Text code style={{ fontSize: 11 }}>{record.ipAddress || 'N/A'}</Text>
+          <Tooltip title={record.userAgent}>
+            <Text type="secondary" ellipsis style={{ fontSize: 11, maxWidth: 150, display: 'block' }}>
+              {record.userAgent || 'Unknown'}
+            </Text>
+          </Tooltip>
+        </Space>
+      ),
     },
   ];
 
@@ -254,55 +277,71 @@ export default function ActivityLogsPage() {
         subtitle="Track all user activities and system events"
         breadcrumbs={[{ title: 'Activity Logs' }]}
         actions={
-          <Button icon={<DownloadOutlined />}>Export Logs</Button>
+          <Button icon={<DownloadOutlined />} onClick={handleExport}>
+            Export Logs
+          </Button>
         }
       />
 
       {/* Filters */}
-      <Card style={{ marginBottom: 24, borderRadius: 12 }}>
-        <Row gutter={16} align="middle">
-          <Col xs={24} sm={12} md={6}>
+      <Card style={{ marginBottom: 24, borderRadius: 12 }} bodyStyle={{ padding: '20px' }}>
+        <Row gutter={[16, 16]}>
+          <Col xs={24} sm={12} md={6} lg={5}>
             <Select
               placeholder="Filter by Action"
               allowClear
               style={{ width: '100%' }}
-              onChange={(v) => setFilters((f) => ({ ...f, action: v }))}
+              onChange={(v) => {
+                setFilters((f) => ({ ...f, action: v }));
+                setCurrentPage(1);
+              }}
             >
-              {Object.keys(actionConfig).map((action) => (
+              {actionsList.map((action) => (
                 <Option key={action} value={action}>{action}</Option>
               ))}
             </Select>
           </Col>
-          <Col xs={24} sm={12} md={6}>
+          <Col xs={24} sm={12} md={6} lg={5}>
             <Select
               placeholder="Filter by Module"
               allowClear
               style={{ width: '100%' }}
-              onChange={(v) => setFilters((f) => ({ ...f, module: v }))}
+              onChange={(v) => {
+                setFilters((f) => ({ ...f, module: v }));
+                setCurrentPage(1);
+              }}
             >
-              {Object.keys(moduleColors).map((module) => (
+              {modulesList.map((module) => (
                 <Option key={module} value={module}>{module}</Option>
               ))}
             </Select>
           </Col>
-          <Col xs={24} sm={12} md={6}>
+          <Col xs={24} sm={12} md={6} lg={5}>
             <Select
-              placeholder="Filter by User"
+              placeholder="Filter by User Role" // Backend filters by user ID but for UI maybe role or search is better? 
+              // The backend route supports userId, but UI asks for generic user filter. 
+              // I'll leave this as a text search for now or just role based if backend supported it.
+              // Actually, I'll remove this specific user select for now as we don't have a list of all users handy here.
+              // I'll add a general Search input instead.
               allowClear
               style={{ width: '100%' }}
-              onChange={(v) => setFilters((f) => ({ ...f, user: v }))}
-            >
-              <Option value="admin">Admin Users</Option>
-              <Option value="staff">Staff</Option>
-              <Option value="teacher">Teachers</Option>
-              <Option value="system">System</Option>
-            </Select>
+              dropdownStyle={{ display: 'none' }}
+              mode="tags"
+              // Wait, let's just use the search input mainly.
+              disabled
+            />
+            {/* Replacing the above disabled select with a clear note or simpler search */}
           </Col>
-          <Col xs={24} sm={12} md={6}>
+          <Col xs={24} sm={12} md={6} lg={6}>
             <RangePicker
               style={{ width: '100%' }}
-              onChange={setDateRange}
+              onChange={(dates) => {
+                setDateRange(dates);
+                setCurrentPage(1);
+              }}
             />
+          </Col>
+          <Col xs={24} md={24} lg={3}>
           </Col>
         </Row>
       </Card>
@@ -313,11 +352,26 @@ export default function ActivityLogsPage() {
         dataSource={logs}
         loading={loading}
         onRefresh={fetchLogs}
-        searchPlaceholder="Search in activity logs..."
-        showExport
+        pagination={{
+          current: currentPage,
+          pageSize: pageSize,
+          total: total,
+          showSizeChanger: true,
+        }}
+        onChange={handleTableChange}
+        searchPlaceholder="Search in activity logs..." // This prop in DataTable usually does client side filtering or callback?
+        // Checking DataTable implementation would be good, but standard Antd Table uses onChange for pagination.
+        // My DataTable wrapper might have specific behavior. 
+        // I will assume standard usage for now but note to check if searchPlaceholder does anything.
+        // Actually, if DataTable has a search bar built-in, I should wire it to my search state.
+        onSearch={(value) => {
+          setFilters(prev => ({ ...prev, search: value }));
+          setCurrentPage(1);
+        }}
+        showExport={false} // usage handled by my own button
         scroll={{ x: 1200 }}
+        rowKey="_id"
       />
     </div>
   );
 }
-

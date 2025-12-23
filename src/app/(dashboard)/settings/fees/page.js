@@ -12,25 +12,17 @@ import {
   Input,
   Select,
   InputNumber,
-  DatePicker,
   Switch,
   message,
-  Divider,
   Typography,
-  Table,
   Spin,
 } from 'antd';
 import {
-  DollarOutlined,
   SaveOutlined,
-  PlusOutlined,
-  DeleteOutlined,
-  SettingOutlined,
 } from '@ant-design/icons';
 import PageHeader from '@/components/common/PageHeader';
-// import { settingsApi } from '@/lib/api';
+import { settingsApi } from '@/lib/api';
 
-const { Title, Text } = Typography;
 const { Option } = Select;
 
 export default function FeeSettingsPage() {
@@ -46,30 +38,63 @@ export default function FeeSettingsPage() {
 
   const fetchSettings = async () => {
     setLoading(true);
-    // try {
-    //   const { data } = await settingsApi.getFeeSettings();
-    //   if (data.success) {
-    //     setSettings(data.data);
-    //     form.setFieldsValue(data.data);
-    //   }
-    // } catch (error) {
-    //   message.error('Failed to fetch fee settings');
-    // } finally {
-    //   setLoading(false);
-    // }
+    try {
+      const response = await settingsApi.getSettings();
+      if (response.data.success) {
+        const settingsData = response.data.data;
+        if (settingsData.feeRules) {
+          const fees = settingsData.feeRules;
+
+          // Text transformation for paymentMethods (Object[] -> String[])
+          // Filter only isEnabled ones or just map method if simple list
+          let paymentMethods = [];
+          if (Array.isArray(fees.paymentMethods)) {
+            paymentMethods = fees.paymentMethods
+              .filter(pm => pm.isEnabled)
+              .map(pm => pm.method);
+          }
+
+          const formattedSettings = {
+            ...fees,
+            paymentMethods
+          };
+
+          setSettings(formattedSettings);
+          form.setFieldsValue(formattedSettings);
+        }
+      }
+    } catch (error) {
+      console.error(error);
+      message.error('Failed to fetch fee settings');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleSubmit = async (values) => {
     setSaving(true);
-    // try {
-    //   await settingsApi.updateFeeSettings(values);
-    //   message.success('Fee settings updated successfully!');
-    //   fetchSettings();
-    // } catch (error) {
-    //   message.error(error.response?.data?.message || 'Failed to update settings');
-    // } finally {
-    //   setSaving(false);
-    // }
+    try {
+      // Transformation for paymentMethods (String[] -> Object[])
+      const formattedValues = { ...values };
+
+      if (values.paymentMethods && Array.isArray(values.paymentMethods)) {
+        formattedValues.paymentMethods = values.paymentMethods.map(method => ({
+          method,
+          isEnabled: true,
+          processingFee: 0, // Default
+          processingFeeType: 'fixed' // Default
+        }));
+      }
+
+      await settingsApi.updateFeeRules(formattedValues);
+      message.success('Fee settings updated successfully!');
+      fetchSettings();
+    } catch (error) {
+      console.error(error);
+      message.error(error.response?.data?.message || 'Failed to update settings');
+    } finally {
+      setSaving(false);
+    }
   };
 
   if (loading) {
@@ -84,7 +109,7 @@ export default function FeeSettingsPage() {
     <div className="fade-in">
       <PageHeader
         title="Fee Settings"
-        subtitle="Configure fee collection rules, discounts, and late fees"
+        subtitle="Configure fee rules and late fees"
         breadcrumbs={[
           { title: 'Settings', path: '/settings' },
           { title: 'Fees' },
@@ -100,12 +125,7 @@ export default function FeeSettingsPage() {
           lateFeePerDay: 10,
           lateFeeGracePeriod: 7,
           maxInstallments: 6,
-          discountTypes: [],
-          scholarshipTypes: [],
           paymentMethods: ['cash', 'cheque', 'bank-transfer', 'online'],
-          autoGenerateInvoices: true,
-          sendPaymentReminders: true,
-          reminderDays: 7,
           ...settings,
         }}
       >
@@ -213,259 +233,6 @@ export default function FeeSettingsPage() {
                   style={{ width: '100%' }}
                 />
               </Form.Item>
-            </Card>
-          </Col>
-        </Row>
-
-        <Row gutter={[24, 24]} style={{ marginTop: 24 }}>
-          {/* Discount Types */}
-          <Col xs={24} lg={12}>
-            <Card title="Discount Types" style={{ borderRadius: 12 }}>
-              <Form.List name="discountTypes">
-                {(fields, { add, remove }) => (
-                  <>
-                    {fields.map(({ key, name, ...restField }, index) => (
-                      <div key={key}>
-                        {index > 0 && <Divider style={{ margin: '12px 0' }} />}
-                        <Row gutter={16} align="middle">
-                          <Col span={8}>
-                            <Form.Item
-                              {...restField}
-                              name={[name, 'name']}
-                              label={index === 0 ? 'Discount Name' : ''}
-                              rules={[{ required: true }]}
-                            >
-                              <Input placeholder="e.g., Sibling Discount" />
-                            </Form.Item>
-                          </Col>
-                          <Col span={6}>
-                            <Form.Item
-                              {...restField}
-                              name={[name, 'type']}
-                              label={index === 0 ? 'Type' : ''}
-                              rules={[{ required: true }]}
-                            >
-                              <Select placeholder="Type">
-                                <Option value="percentage">Percentage</Option>
-                                <Option value="fixed">Fixed Amount</Option>
-                              </Select>
-                            </Form.Item>
-                          </Col>
-                          <Col span={6}>
-                            <Form.Item
-                              {...restField}
-                              name={[name, 'value']}
-                              label={index === 0 ? 'Value' : ''}
-                              rules={[{ required: true }]}
-                            >
-                              <InputNumber
-                                min={0}
-                                max={100}
-                                style={{ width: '100%' }}
-                              />
-                            </Form.Item>
-                          </Col>
-                          <Col span={4}>
-                            {fields.length > 1 && (
-                              <Button
-                                type="link"
-                                danger
-                                onClick={() => remove(name)}
-                                style={{ marginTop: index === 0 ? 30 : 0 }}
-                              >
-                                <DeleteOutlined />
-                              </Button>
-                            )}
-                          </Col>
-                        </Row>
-                      </div>
-                    ))}
-                    <Button
-                      type="dashed"
-                      onClick={() => add()}
-                      icon={<PlusOutlined />}
-                      style={{ width: '100%', marginTop: 16 }}
-                    >
-                      Add Discount Type
-                    </Button>
-                  </>
-                )}
-              </Form.List>
-            </Card>
-          </Col>
-
-          {/* Scholarship Types */}
-          <Col xs={24} lg={12}>
-            <Card title="Scholarship Types" style={{ borderRadius: 12 }}>
-              <Form.List name="scholarshipTypes">
-                {(fields, { add, remove }) => (
-                  <>
-                    {fields.map(({ key, name, ...restField }, index) => (
-                      <div key={key}>
-                        {index > 0 && <Divider style={{ margin: '12px 0' }} />}
-                        <Row gutter={16} align="middle">
-                          <Col span={8}>
-                            <Form.Item
-                              {...restField}
-                              name={[name, 'name']}
-                              label={index === 0 ? 'Scholarship Name' : ''}
-                              rules={[{ required: true }]}
-                            >
-                              <Input placeholder="e.g., Merit Scholarship" />
-                            </Form.Item>
-                          </Col>
-                          <Col span={6}>
-                            <Form.Item
-                              {...restField}
-                              name={[name, 'type']}
-                              label={index === 0 ? 'Type' : ''}
-                              rules={[{ required: true }]}
-                            >
-                              <Select placeholder="Type">
-                                <Option value="percentage">Percentage</Option>
-                                <Option value="fixed">Fixed Amount</Option>
-                              </Select>
-                            </Form.Item>
-                          </Col>
-                          <Col span={6}>
-                            <Form.Item
-                              {...restField}
-                              name={[name, 'value']}
-                              label={index === 0 ? 'Value' : ''}
-                              rules={[{ required: true }]}
-                            >
-                              <InputNumber
-                                min={0}
-                                max={100}
-                                style={{ width: '100%' }}
-                              />
-                            </Form.Item>
-                          </Col>
-                          <Col span={4}>
-                            {fields.length > 1 && (
-                              <Button
-                                type="link"
-                                danger
-                                onClick={() => remove(name)}
-                                style={{ marginTop: index === 0 ? 30 : 0 }}
-                              >
-                                <DeleteOutlined />
-                              </Button>
-                            )}
-                          </Col>
-                        </Row>
-                      </div>
-                    ))}
-                    <Button
-                      type="dashed"
-                      onClick={() => add()}
-                      icon={<PlusOutlined />}
-                      style={{ width: '100%', marginTop: 16 }}
-                    >
-                      Add Scholarship Type
-                    </Button>
-                  </>
-                )}
-              </Form.List>
-            </Card>
-          </Col>
-        </Row>
-
-        <Row gutter={[24, 24]} style={{ marginTop: 24 }}>
-          {/* Fee Collection Rules */}
-          <Col xs={24}>
-            <Card title="Fee Collection Rules" style={{ borderRadius: 12 }}>
-              <Row gutter={24}>
-                <Col xs={24} md={6}>
-                  <Form.Item
-                    name="feeCollectionStartDay"
-                    label="Collection Start Day"
-                  >
-                    <InputNumber
-                      min={1}
-                      max={31}
-                      placeholder="1"
-                      style={{ width: '100%' }}
-                    />
-                  </Form.Item>
-                </Col>
-                <Col xs={24} md={6}>
-                  <Form.Item
-                    name="feeDueDay"
-                    label="Due Day of Month"
-                  >
-                    <InputNumber
-                      min={1}
-                      max={31}
-                      placeholder="10"
-                      style={{ width: '100%' }}
-                    />
-                  </Form.Item>
-                </Col>
-                <Col xs={24} md={6}>
-                  <Form.Item
-                    name="feeReminderFrequency"
-                    label="Reminder Frequency (Days)"
-                  >
-                    <InputNumber
-                      min={1}
-                      max={30}
-                      placeholder="7"
-                      style={{ width: '100%' }}
-                    />
-                  </Form.Item>
-                </Col>
-                <Col xs={24} md={6}>
-                  <Form.Item
-                    name="maxOverdueDays"
-                    label="Maximum Overdue Days"
-                  >
-                    <InputNumber
-                      min={30}
-                      max={365}
-                      placeholder="90"
-                      style={{ width: '100%' }}
-                    />
-                  </Form.Item>
-                </Col>
-              </Row>
-
-              <Divider />
-
-              <Row gutter={24}>
-                <Col xs={24} md={8}>
-                  <Form.Item
-                    name="allowPartialPayments"
-                    label="Allow Partial Payments"
-                    valuePropName="checked"
-                  >
-                    <Switch />
-                  </Form.Item>
-                </Col>
-                <Col xs={24} md={8}>
-                  <Form.Item
-                    name="autoApplyDiscounts"
-                    label="Auto-apply Eligible Discounts"
-                    valuePropName="checked"
-                  >
-                    <Switch />
-                  </Form.Item>
-                </Col>
-                <Col xs={24} md={8}>
-                  <Form.Item
-                    name="requireApprovalForDiscounts"
-                    label="Require Approval for Discounts >"
-                  >
-                    <InputNumber
-                      min={0}
-                      placeholder="1000"
-                      style={{ width: '100%' }}
-                      formatter={(value) => `Rs. ${value}`}
-                      parser={(value) => value.replace(/Rs\.\s?|(,*)/g, '')}
-                    />
-                  </Form.Item>
-                </Col>
-              </Row>
             </Card>
           </Col>
         </Row>

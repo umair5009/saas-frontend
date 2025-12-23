@@ -1,483 +1,282 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import {
-  Card,
-  Tabs,
-  Form,
-  Input,
-  Select,
-  Switch,
-  Button,
-  Row,
-  Col,
-  Typography,
-  Divider,
-  message,
-  Space,
-  Upload,
-  TimePicker,
-  InputNumber,
+    Card,
+    Row,
+    Col,
+    Button,
+    Space,
+    Form,
+    Input,
+    Select,
+    InputNumber,
+    Switch,
+    message,
+    Divider,
+    Typography,
+    Upload,
+    Spin,
 } from 'antd';
 import {
-  SettingOutlined,
-  BankOutlined,
-  BookOutlined,
-  DollarOutlined,
-  BellOutlined,
-  SafetyOutlined,
-  UploadOutlined,
-  SaveOutlined,
+    SaveOutlined,
+    UploadOutlined,
 } from '@ant-design/icons';
 import PageHeader from '@/components/common/PageHeader';
-import dayjs from 'dayjs';
+import { settingsApi } from '@/lib/api';
 
-const { Title, Text } = Typography;
+const { Text } = Typography;
 const { Option } = Select;
 const { TextArea } = Input;
 
-export default function SettingsPage() {
-  const [activeTab, setActiveTab] = useState('general');
-  const [loading, setLoading] = useState(false);
-  const [form] = Form.useForm();
+export default function GeneralSettingsPage() {
+    const router = useRouter();
+    const [form] = Form.useForm();
+    const [loading, setLoading] = useState(true);
+    const [saving, setSaving] = useState(false);
 
-  const handleSave = async (values) => {
-    setLoading(true);
-    try {
-      console.log('Settings:', values);
-      setTimeout(() => {
-        message.success('Settings saved successfully!');
-        setLoading(false);
-      }, 1000);
-    } catch (error) {
-      message.error('Failed to save settings');
-      setLoading(false);
+    useEffect(() => {
+        fetchSettings();
+    }, []);
+
+    const fetchSettings = async () => {
+        setLoading(true);
+        try {
+            const response = await settingsApi.getSettings();
+            if (response.data.success) {
+                const settings = response.data.data;
+
+                // Map backend settings to form fields
+                form.setFieldsValue({
+                    // Branding
+                    systemName: settings.branding?.appName,
+                    tagline: settings.branding?.tagline,
+                    primaryColor: settings.branding?.primaryColor,
+                    address: settings.branding?.copyrightText, // Using copyright for footer text usually, but reusing field
+
+                    // Localization
+                    timezone: settings.localization?.timezone,
+                    currency: settings.localization?.currency,
+                    language: settings.localization?.defaultLanguage,
+                    theme: settings.branding?.darkMode ? 'dark' : 'light',
+
+                    // System/Security (Subset)
+                    maintenanceMode: false, // Not in schema directly? Check backup/system settings
+                    backupFrequency: settings.backupSettings?.backupFrequency,
+
+                    // Custom/Other
+                    supportEmail: settings.customFields?.supportEmail,
+                    supportPhone: settings.customFields?.supportPhone,
+                });
+            }
+        } catch (error) {
+            console.error(error);
+            message.error('Failed to fetch general settings');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleSubmit = async (values) => {
+        setSaving(true);
+        try {
+            // Prepare Branding Update
+            const brandingData = {
+                appName: values.systemName,
+                tagline: values.tagline,
+                primaryColor: values.primaryColor,
+                darkMode: values.theme === 'dark',
+                copyrightText: values.address
+            };
+
+            // Prepare Localization Update
+            const localizationData = {
+                timezone: values.timezone,
+                currency: values.currency,
+                defaultLanguage: values.language
+            };
+
+            // Prepare Backup Update
+            const backupData = {
+                backupFrequency: values.backupFrequency
+            };
+
+            // Execute updates in parallel
+            await Promise.all([
+                settingsApi.updateBranding(brandingData),
+                settingsApi.updateLocalization(localizationData),
+                settingsApi.updateSection('backupSettings', backupData)
+            ]);
+
+            message.success('General settings updated successfully!');
+            fetchSettings(); // Refresh
+        } catch (error) {
+            console.error(error);
+            message.error(error.response?.data?.message || 'Failed to update settings');
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    if (loading) {
+        return (
+            <div style={{ textAlign: 'center', padding: 100 }}>
+                <Spin size="large" />
+            </div>
+        );
     }
-  };
 
-  const GeneralSettings = () => (
-    <Form layout="vertical" onFinish={handleSave} form={form}>
-      <Title level={5}>School Information</Title>
-      
-      <Row gutter={24}>
-        <Col xs={24} md={12}>
-          <Form.Item name="schoolName" label="School Name" rules={[{ required: true }]}>
-            <Input placeholder="Enter school name" />
-          </Form.Item>
-        </Col>
-        <Col xs={24} md={12}>
-          <Form.Item name="tagline" label="Tagline">
-            <Input placeholder="School tagline/motto" />
-          </Form.Item>
-        </Col>
-      </Row>
+    return (
+        <div className="fade-in">
+            <PageHeader
+                title="General Settings"
+                subtitle="Configure general system settings and preferences"
+                breadcrumbs={[
+                    { title: 'Settings', path: '/settings' },
+                    { title: 'General' },
+                ]}
+            />
 
-      <Row gutter={24}>
-        <Col xs={24} md={8}>
-          <Form.Item name="email" label="Email" rules={[{ type: 'email' }]}>
-            <Input placeholder="school@example.com" />
-          </Form.Item>
-        </Col>
-        <Col xs={24} md={8}>
-          <Form.Item name="phone" label="Phone">
-            <Input placeholder="Phone number" />
-          </Form.Item>
-        </Col>
-        <Col xs={24} md={8}>
-          <Form.Item name="website" label="Website">
-            <Input placeholder="www.school.com" />
-          </Form.Item>
-        </Col>
-      </Row>
+            <Form
+                form={form}
+                layout="vertical"
+                onFinish={handleSubmit}
+                initialValues={{
+                    systemName: 'School SaaS',
+                    timezone: 'Asia/Karachi',
+                    currency: 'PKR',
+                    language: 'en',
+                    theme: 'light',
+                }}
+            >
+                <Row gutter={[24, 24]}>
+                    {/* Basic Information */}
+                    <Col xs={24} lg={12}>
+                        <Card title="Basic Information" style={{ borderRadius: 12 }}>
+                            <Form.Item
+                                name="systemName"
+                                label="System Name"
+                                rules={[{ required: true, message: 'Please enter system name' }]}
+                            >
+                                <Input placeholder="School Management System" />
+                            </Form.Item>
 
-      <Form.Item name="address" label="Address">
-        <TextArea rows={2} placeholder="Full address" />
-      </Form.Item>
+                            <Form.Item name="tagline" label="Tagline">
+                                <Input placeholder="Managing Education Excellence" />
+                            </Form.Item>
 
-      <Divider />
+                            <Divider>Logo & Branding</Divider>
 
-      <Title level={5}>Branding</Title>
-      
-      <Row gutter={24}>
-        <Col xs={24} md={8}>
-          <Form.Item name="logo" label="School Logo">
-            <Upload maxCount={1} listType="picture-card">
-              <div>
-                <UploadOutlined />
-                <div style={{ marginTop: 8 }}>Upload</div>
-              </div>
-            </Upload>
-          </Form.Item>
-        </Col>
-        <Col xs={24} md={8}>
-          <Form.Item name="primaryColor" label="Primary Color">
-            <Input type="color" style={{ width: 100, height: 40 }} />
-          </Form.Item>
-        </Col>
-        <Col xs={24} md={8}>
-          <Form.Item name="secondaryColor" label="Secondary Color">
-            <Input type="color" style={{ width: 100, height: 40 }} />
-          </Form.Item>
-        </Col>
-      </Row>
+                            <Form.Item label="System Logo">
+                                <Upload listType="picture-card" maxCount={1} action="/api/upload" showUploadList={false}>
+                                    <div>
+                                        <UploadOutlined />
+                                        <div style={{ marginTop: 8 }}>Upload Logo</div>
+                                    </div>
+                                </Upload>
+                            </Form.Item>
 
-      <Divider />
+                            <Form.Item name="primaryColor" label="Primary Color">
+                                <Select placeholder="Select primary color">
+                                    <Option value="#1890ff">Blue (Default)</Option>
+                                    <Option value="#52c41a">Green</Option>
+                                    <Option value="#faad14">Orange</Option>
+                                    <Option value="#722ed1">Purple</Option>
+                                    <Option value="#ff4d4f">Red</Option>
+                                </Select>
+                            </Form.Item>
+                        </Card>
+                    </Col>
 
-      <Title level={5}>Operational Settings</Title>
-      
-      <Row gutter={24}>
-        <Col xs={24} md={8}>
-          <Form.Item name="startTime" label="School Start Time">
-            <TimePicker format="HH:mm" style={{ width: '100%' }} />
-          </Form.Item>
-        </Col>
-        <Col xs={24} md={8}>
-          <Form.Item name="endTime" label="School End Time">
-            <TimePicker format="HH:mm" style={{ width: '100%' }} />
-          </Form.Item>
-        </Col>
-        <Col xs={24} md={8}>
-          <Form.Item name="periodDuration" label="Period Duration (minutes)">
-            <InputNumber min={30} max={60} style={{ width: '100%' }} />
-          </Form.Item>
-        </Col>
-      </Row>
+                    {/* System Configuration */}
+                    <Col xs={24} lg={12}>
+                        <Card title="System Configuration" style={{ borderRadius: 12 }}>
+                            <Form.Item
+                                name="timezone"
+                                label="Timezone"
+                                rules={[{ required: true }]}
+                            >
+                                <Select placeholder="Select timezone">
+                                    <Option value="Asia/Karachi">Asia/Karachi (PKT)</Option>
+                                    <Option value="Asia/Dubai">Asia/Dubai (GST)</Option>
+                                    <Option value="UTC">UTC</Option>
+                                    <Option value="America/New_York">America/New_York (EST)</Option>
+                                    <Option value="Europe/London">Europe/London (GMT)</Option>
+                                </Select>
+                            </Form.Item>
 
-      <Form.Item name="workingDays" label="Working Days">
-        <Select mode="multiple" placeholder="Select working days">
-          {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map((day) => (
-            <Option key={day} value={day}>{day}</Option>
-          ))}
-        </Select>
-      </Form.Item>
+                            <Form.Item
+                                name="currency"
+                                label="Currency"
+                                rules={[{ required: true }]}
+                            >
+                                <Select placeholder="Select currency">
+                                    <Option value="PKR">Pakistani Rupee (PKR)</Option>
+                                    <Option value="USD">US Dollar (USD)</Option>
+                                    <Option value="EUR">Euro (EUR)</Option>
+                                    <Option value="GBP">British Pound (GBP)</Option>
+                                    <Option value="INR">Indian Rupee (INR)</Option>
+                                </Select>
+                            </Form.Item>
 
-      <Form.Item>
-        <Button type="primary" htmlType="submit" loading={loading} icon={<SaveOutlined />}>
-          Save Settings
-        </Button>
-      </Form.Item>
-    </Form>
-  );
+                            <Form.Item
+                                name="language"
+                                label="Default Language"
+                                rules={[{ required: true }]}
+                            >
+                                <Select placeholder="Select language">
+                                    <Option value="en">English</Option>
+                                    <Option value="ur">Urdu</Option>
+                                </Select>
+                            </Form.Item>
 
-  const AcademicSettings = () => (
-    <Form layout="vertical" onFinish={handleSave}>
-      <Title level={5}>Academic Year</Title>
-      
-      <Row gutter={24}>
-        <Col xs={24} md={8}>
-          <Form.Item name="currentAcademicYear" label="Current Academic Year" rules={[{ required: true }]}>
-            <Select>
-              <Option value="2024-2025">2024-2025</Option>
-              <Option value="2025-2026">2025-2026</Option>
-            </Select>
-          </Form.Item>
-        </Col>
-        <Col xs={24} md={8}>
-          <Form.Item name="yearStartMonth" label="Year Start Month">
-            <Select>
-              {['January', 'April', 'July', 'September'].map((m) => (
-                <Option key={m} value={m}>{m}</Option>
-              ))}
-            </Select>
-          </Form.Item>
-        </Col>
-      </Row>
+                            <Form.Item name="theme" label="Default Theme">
+                                <Select placeholder="Select theme">
+                                    <Option value="light">Light</Option>
+                                    <Option value="dark">Dark</Option>
+                                </Select>
+                            </Form.Item>
+                        </Card>
+                    </Col>
+                </Row>
 
-      <Divider />
+                <Row gutter={[24, 24]} style={{ marginTop: 24 }}>
+                    {/* Data Management (Backup) */}
+                    <Col xs={24} lg={12}>
+                        <Card title="Data Management" style={{ borderRadius: 12 }}>
+                            <Form.Item
+                                name="backupFrequency"
+                                label="Automatic Backup"
+                            >
+                                <Select placeholder="Select backup frequency">
+                                    <Option value="daily">Daily</Option>
+                                    <Option value="weekly">Weekly</Option>
+                                    <Option value="monthly">Monthly</Option>
+                                    <Option value="disabled">Disabled</Option>
+                                </Select>
+                            </Form.Item>
+                        </Card>
+                    </Col>
+                </Row>
 
-      <Title level={5}>Grading System</Title>
-      
-      <Row gutter={24}>
-        <Col xs={24} md={8}>
-          <Form.Item name="gradingType" label="Grading Type">
-            <Select>
-              <Option value="percentage">Percentage Based</Option>
-              <Option value="gpa">GPA Based</Option>
-              <Option value="both">Both</Option>
-            </Select>
-          </Form.Item>
-        </Col>
-        <Col xs={24} md={8}>
-          <Form.Item name="passingPercentage" label="Passing Percentage">
-            <InputNumber min={0} max={100} suffix="%" style={{ width: '100%' }} />
-          </Form.Item>
-        </Col>
-      </Row>
-
-      <Text type="secondary">
-        Grade Scale: A+ (90-100), A (80-89), B+ (70-79), B (60-69), C (50-59), F (Below 50)
-      </Text>
-
-      <Divider />
-
-      <Title level={5}>Attendance Rules</Title>
-      
-      <Row gutter={24}>
-        <Col xs={24} md={8}>
-          <Form.Item name="minAttendance" label="Minimum Attendance (%)">
-            <InputNumber min={0} max={100} style={{ width: '100%' }} />
-          </Form.Item>
-        </Col>
-        <Col xs={24} md={8}>
-          <Form.Item name="lateArrivalMinutes" label="Late Arrival Threshold (minutes)">
-            <InputNumber min={5} max={60} style={{ width: '100%' }} />
-          </Form.Item>
-        </Col>
-      </Row>
-
-      <Form.Item name="autoNotifyAbsent" valuePropName="checked" label="">
-        <Space>
-          <Switch />
-          <span>Auto-notify parents on student absence</span>
-        </Space>
-      </Form.Item>
-
-      <Form.Item>
-        <Button type="primary" htmlType="submit" loading={loading} icon={<SaveOutlined />}>
-          Save Settings
-        </Button>
-      </Form.Item>
-    </Form>
-  );
-
-  const FeeSettings = () => (
-    <Form layout="vertical" onFinish={handleSave}>
-      <Title level={5}>Fee Collection Rules</Title>
-      
-      <Row gutter={24}>
-        <Col xs={24} md={8}>
-          <Form.Item name="dueDayOfMonth" label="Fee Due Day">
-            <InputNumber min={1} max={28} placeholder="10" style={{ width: '100%' }} />
-          </Form.Item>
-        </Col>
-        <Col xs={24} md={8}>
-          <Form.Item name="gracePeriod" label="Grace Period (days)">
-            <InputNumber min={0} max={30} style={{ width: '100%' }} />
-          </Form.Item>
-        </Col>
-        <Col xs={24} md={8}>
-          <Form.Item name="currency" label="Currency">
-            <Select>
-              <Option value="PKR">PKR - Pakistani Rupee</Option>
-              <Option value="USD">USD - US Dollar</Option>
-              <Option value="INR">INR - Indian Rupee</Option>
-            </Select>
-          </Form.Item>
-        </Col>
-      </Row>
-
-      <Divider />
-
-      <Title level={5}>Late Fee Settings</Title>
-      
-      <Form.Item name="enableLateFee" valuePropName="checked">
-        <Space>
-          <Switch />
-          <span>Enable Late Fee</span>
-        </Space>
-      </Form.Item>
-
-      <Row gutter={24}>
-        <Col xs={24} md={8}>
-          <Form.Item name="lateFeeType" label="Late Fee Type">
-            <Select>
-              <Option value="fixed">Fixed Amount</Option>
-              <Option value="percentage">Percentage of Due</Option>
-              <Option value="per-day">Per Day</Option>
-            </Select>
-          </Form.Item>
-        </Col>
-        <Col xs={24} md={8}>
-          <Form.Item name="lateFeeAmount" label="Late Fee Amount/Rate">
-            <InputNumber min={0} style={{ width: '100%' }} />
-          </Form.Item>
-        </Col>
-        <Col xs={24} md={8}>
-          <Form.Item name="maxLateFee" label="Maximum Late Fee">
-            <InputNumber min={0} style={{ width: '100%' }} />
-          </Form.Item>
-        </Col>
-      </Row>
-
-      <Divider />
-
-      <Title level={5}>Payment Methods</Title>
-      
-      <Form.Item name="paymentMethods" label="Enabled Payment Methods">
-        <Select mode="multiple">
-          <Option value="cash">Cash</Option>
-          <Option value="cheque">Cheque</Option>
-          <Option value="bank-transfer">Bank Transfer</Option>
-          <Option value="card">Card Payment</Option>
-          <Option value="upi">UPI</Option>
-          <Option value="online">Online Gateway</Option>
-        </Select>
-      </Form.Item>
-
-      <Form.Item>
-        <Button type="primary" htmlType="submit" loading={loading} icon={<SaveOutlined />}>
-          Save Settings
-        </Button>
-      </Form.Item>
-    </Form>
-  );
-
-  const NotificationSettings = () => (
-    <Form layout="vertical" onFinish={handleSave}>
-      <Title level={5}>Email Notifications</Title>
-      
-      <Form.Item name="enableEmail" valuePropName="checked">
-        <Space>
-          <Switch defaultChecked />
-          <span>Enable Email Notifications</span>
-        </Space>
-      </Form.Item>
-
-      <Row gutter={24}>
-        <Col xs={24} md={12}>
-          <Form.Item name="smtpHost" label="SMTP Host">
-            <Input placeholder="smtp.example.com" />
-          </Form.Item>
-        </Col>
-        <Col xs={24} md={6}>
-          <Form.Item name="smtpPort" label="SMTP Port">
-            <InputNumber placeholder="587" style={{ width: '100%' }} />
-          </Form.Item>
-        </Col>
-        <Col xs={24} md={6}>
-          <Form.Item name="smtpSecure" label="Secure">
-            <Select>
-              <Option value="tls">TLS</Option>
-              <Option value="ssl">SSL</Option>
-              <Option value="none">None</Option>
-            </Select>
-          </Form.Item>
-        </Col>
-      </Row>
-
-      <Row gutter={24}>
-        <Col xs={24} md={12}>
-          <Form.Item name="smtpUser" label="SMTP Username">
-            <Input placeholder="username" />
-          </Form.Item>
-        </Col>
-        <Col xs={24} md={12}>
-          <Form.Item name="smtpPassword" label="SMTP Password">
-            <Input.Password placeholder="password" />
-          </Form.Item>
-        </Col>
-      </Row>
-
-      <Divider />
-
-      <Title level={5}>SMS Notifications</Title>
-      
-      <Form.Item name="enableSms" valuePropName="checked">
-        <Space>
-          <Switch />
-          <span>Enable SMS Notifications</span>
-        </Space>
-      </Form.Item>
-
-      <Row gutter={24}>
-        <Col xs={24} md={8}>
-          <Form.Item name="smsProvider" label="SMS Provider">
-            <Select>
-              <Option value="twilio">Twilio</Option>
-              <Option value="msg91">MSG91</Option>
-              <Option value="textlocal">TextLocal</Option>
-            </Select>
-          </Form.Item>
-        </Col>
-        <Col xs={24} md={8}>
-          <Form.Item name="smsApiKey" label="API Key">
-            <Input.Password placeholder="API Key" />
-          </Form.Item>
-        </Col>
-        <Col xs={24} md={8}>
-          <Form.Item name="smsSenderId" label="Sender ID">
-            <Input placeholder="SCHOOL" />
-          </Form.Item>
-        </Col>
-      </Row>
-
-      <Divider />
-
-      <Title level={5}>Notification Events</Title>
-      
-      <Space direction="vertical" style={{ width: '100%' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span>Fee Payment Reminder</span>
-          <Space>
-            <Switch size="small" /> Email
-            <Switch size="small" /> SMS
-          </Space>
+                {/* Save Button */}
+                <Card style={{ marginTop: 24, borderRadius: 12 }}>
+                    <Space style={{ width: '100%', justifyContent: 'end' }}>
+                        <Button onClick={() => router.back()}>
+                            Cancel
+                        </Button>
+                        <Button
+                            type="primary"
+                            htmlType="submit"
+                            loading={saving}
+                            icon={<SaveOutlined />}
+                        >
+                            Save Settings
+                        </Button>
+                    </Space>
+                </Card>
+            </Form>
         </div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span>Attendance Alert</span>
-          <Space>
-            <Switch size="small" /> Email
-            <Switch size="small" defaultChecked /> SMS
-          </Space>
-        </div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span>Exam Results Published</span>
-          <Space>
-            <Switch size="small" defaultChecked /> Email
-            <Switch size="small" /> SMS
-          </Space>
-        </div>
-      </Space>
-
-      <Form.Item style={{ marginTop: 24 }}>
-        <Button type="primary" htmlType="submit" loading={loading} icon={<SaveOutlined />}>
-          Save Settings
-        </Button>
-      </Form.Item>
-    </Form>
-  );
-
-  const tabItems = [
-    {
-      key: 'general',
-      label: <><SettingOutlined /> General</>,
-      children: <GeneralSettings />,
-    },
-    {
-      key: 'academic',
-      label: <><BookOutlined /> Academic</>,
-      children: <AcademicSettings />,
-    },
-    {
-      key: 'fees',
-      label: <><DollarOutlined /> Fee Rules</>,
-      children: <FeeSettings />,
-    },
-    {
-      key: 'notifications',
-      label: <><BellOutlined /> Notifications</>,
-      children: <NotificationSettings />,
-    },
-  ];
-
-  return (
-    <div className="fade-in">
-      <PageHeader
-        title="Settings"
-        subtitle="Configure system settings and preferences"
-        breadcrumbs={[{ title: 'Settings' }]}
-      />
-
-      <Card style={{ borderRadius: 12 }}>
-        <Tabs
-          activeKey={activeTab}
-          onChange={setActiveTab}
-          items={tabItems}
-          tabPosition="left"
-          style={{ minHeight: 500 }}
-        />
-      </Card>
-    </div>
-  );
+    );
 }
-

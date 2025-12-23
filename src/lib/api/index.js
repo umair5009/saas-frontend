@@ -14,3 +14,6 @@ export { inventoryApi } from './inventory';
 export { notificationApi } from './notifications';
 export { reportsApi } from './reports';
 export { uploadApi } from './upload';
+export { settingsApi } from './settings';
+export { activityLogApi } from './activityLogs';
+
