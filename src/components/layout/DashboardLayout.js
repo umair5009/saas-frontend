@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import { Layout, Menu, Avatar, Dropdown, Space, Typography, Badge, Button, Select } from 'antd';
+import Link from 'next/link';
+import { Layout, Menu, Avatar, Dropdown, Space, Typography, Badge, Button, Select, Spin } from 'antd';
 import {
     MenuFoldOutlined,
     MenuUnfoldOutlined,
@@ -79,8 +80,11 @@ export default function DashboardLayout({ children }) {
         if (user) fetchBranches();
     }, [user]);
 
-    // Get menu items based on user role
-    const menuItems = user ? getMenuItemsByRole(user.role) : [];
+    // Get menu items based on user role with Link prefetching for faster navigation
+    const menuItems = useMemo(() =>
+        user ? getMenuItemsByRole(user.role, Link) : [],
+        [user]
+    );
     const roleColor = roleColors[user?.role] || roleColors.staff;
 
     // User dropdown menu
@@ -128,7 +132,20 @@ export default function DashboardLayout({ children }) {
         return [];
     };
 
-    if (!mounted) return null;
+    // Show skeleton layout while mounting instead of blank screen
+    if (!mounted) {
+        return (
+            <Layout style={{ minHeight: '100vh' }}>
+                <Sider width={260} style={{ background: '#001529' }} />
+                <Layout style={{ marginLeft: 260 }}>
+                    <Header style={{ background: '#001529', padding: '0 24px' }} />
+                    <Content style={{ margin: 24, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                        <Spin size="large" />
+                    </Content>
+                </Layout>
+            </Layout>
+        );
+    }
 
     return (
         <Layout style={{ minHeight: '100vh' }}>

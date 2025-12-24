@@ -204,17 +204,21 @@ export const menuItems = [
   },
 ];
 
-// Get menu items based on user role
-export const getMenuItemsByRole = (userRole) => {
+// Get menu items based on user role with Link wrappers for prefetching
+export const getMenuItemsByRole = (userRole, LinkComponent = null) => {
   return menuItems
     .filter((item) => item.roles.includes(userRole))
     .map((item) => ({
       key: item.key,
       icon: item.icon,
-      label: item.label,
+      label: LinkComponent && item.key.startsWith('/') ? (
+        <LinkComponent href={item.key} prefetch={true}>{item.label}</LinkComponent>
+      ) : item.label,
       children: item.children?.map((child) => ({
         key: child.key,
-        label: child.label,
+        label: LinkComponent ? (
+          <LinkComponent href={child.key} prefetch={true}>{child.label}</LinkComponent>
+        ) : child.label,
       })),
     }));
 };

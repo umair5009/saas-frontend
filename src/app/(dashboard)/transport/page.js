@@ -21,6 +21,7 @@ import {
   Input,
   Select,
   message,
+  Spin,
 } from 'antd';
 import {
   PlusOutlined,
@@ -34,6 +35,7 @@ import {
   MoreOutlined,
   PhoneOutlined,
   CheckCircleOutlined,
+  ReloadOutlined,
 } from '@ant-design/icons';
 import PageHeader from '@/components/common/PageHeader';
 import DataTable from '@/components/common/DataTable';
@@ -55,8 +57,14 @@ export default function TransportPage() {
   const [vehicles, setVehicles] = useState([]);
   const [routes, setRoutes] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState({});
-  const [routeModal, setRouteModal] = useState({ open: false, route: null });
+  const [stats, setStats] = useState({
+    totalVehicles: 0,
+    activeVehicles: 0,
+    totalRoutes: 0,
+    totalStudents: 0,
+    totalDrivers: 0,
+    avgCapacity: 0,
+  });
 
   useEffect(() => {
     fetchData();
@@ -65,104 +73,88 @@ export default function TransportPage() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      // Mock data
-      setStats({
-        totalVehicles: 12,
-        activeVehicles: 10,
-        totalRoutes: 8,
-        totalStudents: 450,
-        totalDrivers: 12,
-        avgCapacity: 78,
-      });
+      // Fetch vehicles and summary in parallel
+      const [vehiclesRes, summaryRes] = await Promise.all([
+        transportApi.getVehicles(),
+        transportApi.getDashboard().catch(() => null), // fallback if endpoint doesn't exist
+      ]);
 
-      const mockVehicles = [
-        {
-          _id: '1',
-          vehicleNumber: 'LHR-1234',
-          type: 'bus',
-          model: 'Toyota Coaster',
-          capacity: 40,
-          currentOccupancy: 35,
-          driver: { name: 'Ahmed Khan', phone: '03001234567' },
-          route: 'Route A - DHA',
-          status: 'active',
-          lastMaintenance: '2025-01-01',
-        },
-        {
-          _id: '2',
-          vehicleNumber: 'LHR-5678',
-          type: 'van',
-          model: 'Hiace',
-          capacity: 15,
-          currentOccupancy: 12,
-          driver: { name: 'Ali Hassan', phone: '03009876543' },
-          route: 'Route B - Model Town',
-          status: 'on-route',
-          lastMaintenance: '2025-01-10',
-        },
-        {
-          _id: '3',
-          vehicleNumber: 'LHR-9012',
-          type: 'bus',
-          model: 'Yutong',
-          capacity: 50,
-          currentOccupancy: 0,
-          driver: { name: 'Usman Ali', phone: '03005555555' },
-          route: 'Route C - Johar Town',
-          status: 'maintenance',
-          lastMaintenance: '2024-12-15',
-        },
-      ];
+      if (vehiclesRes.data.success) {
+        const vehicleData = vehiclesRes.data.data || [];
+        setVehicles(vehicleData);
 
-      const mockRoutes = [
-        {
-          _id: '1',
-          name: 'Route A - DHA',
-          startPoint: 'School Main Campus',
-          endPoint: 'DHA Phase 6',
-          stops: 8,
-          distance: '15 km',
-          duration: '45 min',
-          assignedVehicle: 'LHR-1234',
-          students: 35,
-          fare: 3000,
-          status: 'active',
-        },
-        {
-          _id: '2',
-          name: 'Route B - Model Town',
-          startPoint: 'School Main Campus',
-          endPoint: 'Model Town Link Road',
-          stops: 6,
-          distance: '12 km',
-          duration: '35 min',
-          assignedVehicle: 'LHR-5678',
-          students: 28,
-          fare: 2500,
-          status: 'active',
-        },
-        {
-          _id: '3',
-          name: 'Route C - Johar Town',
-          startPoint: 'School Main Campus',
-          endPoint: 'Johar Town G Block',
-          stops: 10,
-          distance: '18 km',
-          duration: '50 min',
-          assignedVehicle: 'LHR-9012',
-          students: 42,
-          fare: 3500,
-          status: 'inactive',
-        },
-      ];
+        // Extract routes from vehicles
+        const allRoutes = [];
+        vehicleData.forEach(vehicle => {
+          if (vehicle.routes && vehicle.routes.length > 0) {
+            vehicle.routes.forEach(route => {
+              allRoutes.push({
+                ...route,
+                _id: route._id || `${vehicle._id}-${route.name}`,
+                assignedVehicle: vehicle.vehicleNumber,
+                vehicleId: vehicle._id,
+              });
+            });
+          }
+        });
+        setRoutes(allRoutes);
 
-      setVehicles(mockVehicles);
-      setRoutes(mockRoutes);
+        // Calculate stats from vehicle data
+        const activeCount = vehicleData.filter(v => v.status === 'active' || v.status === 'on-route').length;
+        const totalStudents = vehicleData.reduce((sum, v) => sum + (v.assignedStudents?.length || 0), 0);
+        const totalCapacity = vehicleData.reduce((sum, v) => sum + (v.capacity || 0), 0);
+        const currentOccupancy = vehicleData.reduce((sum, v) => sum + (v.assignedStudents?.length || 0), 0);
+
+        setStats({
+          totalVehicles: vehicleData.length,
+          activeVehicles: activeCount,
+          totalRoutes: allRoutes.length,
+          totalStudents: totalStudents,
+          totalDrivers: vehicleData.filter(v => v.driver).length,
+          avgCapacity: totalCapacity > 0 ? Math.round((currentOccupancy / totalCapacity) * 100) : 0,
+        });
+      }
+
+      // If summary endpoint works, use its data
+      if (summaryRes?.data?.success && summaryRes.data.data) {
+        const summary = summaryRes.data.data;
+        setStats(prev => ({
+          ...prev,
+          ...summary,
+        }));
+      }
     } catch (error) {
+      console.error('Error fetching transport data:', error);
       message.error('Failed to fetch transport data');
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleDeleteVehicle = async (vehicleId) => {
+    Modal.confirm({
+      title: 'Delete Vehicle',
+      content: 'Are you sure you want to delete this vehicle? This action cannot be undone.',
+      okText: 'Delete',
+      okType: 'danger',
+      onOk: async () => {
+        try {
+          await transportApi.deleteVehicle(vehicleId);
+          message.success('Vehicle deleted successfully');
+          fetchData();
+        } catch (error) {
+          message.error(error.response?.data?.message || 'Failed to delete vehicle');
+        }
+      },
+    });
+  };
+
+  const handleViewVehicle = (vehicleId) => {
+    router.push(`/transport/vehicles/${vehicleId}`);
+  };
+
+  const handleEditVehicle = (vehicleId) => {
+    router.push(`/transport/vehicles/${vehicleId}/edit`);
   };
 
   const vehicleColumns = [
@@ -190,37 +182,62 @@ export default function TransportPage() {
       key: 'driver',
       render: (_, record) => (
         <div>
-          <Text>{record.driver?.name}</Text>
-          <div style={{ fontSize: 12, color: '#8c8c8c' }}>
-            <PhoneOutlined /> {record.driver?.phone}
-          </div>
+          <Text>{record.driver?.name || 'Not Assigned'}</Text>
+          {record.driver?.phone && (
+            <div style={{ fontSize: 12, color: '#8c8c8c' }}>
+              <PhoneOutlined /> {record.driver.phone}
+            </div>
+          )}
         </div>
       ),
     },
     {
-      title: 'Route',
-      dataIndex: 'route',
-      key: 'route',
+      title: 'Routes',
+      key: 'routes',
+      render: (_, record) => (
+        <Space direction="vertical" size={0}>
+          {record.routes?.length > 0 ? (
+            record.routes.slice(0, 2).map((route, idx) => (
+              <Tag key={idx} style={{ margin: 2 }}>{route.name}</Tag>
+            ))
+          ) : (
+            <Text type="secondary">No routes</Text>
+          )}
+          {record.routes?.length > 2 && (
+            <Text type="secondary" style={{ fontSize: 11 }}>
+              +{record.routes.length - 2} more
+            </Text>
+          )}
+        </Space>
+      ),
     },
     {
       title: 'Capacity',
       key: 'capacity',
-      render: (_, record) => (
-        <div style={{ width: 100 }}>
-          <Progress
-            percent={Math.round((record.currentOccupancy / record.capacity) * 100)}
-            size="small"
-            format={() => `${record.currentOccupancy}/${record.capacity}`}
-          />
-        </div>
-      ),
+      render: (_, record) => {
+        const occupied = record.assignedStudents?.length || 0;
+        const capacity = record.capacity || 0;
+        const percent = capacity > 0 ? Math.round((occupied / capacity) * 100) : 0;
+        return (
+          <div style={{ width: 100 }}>
+            <Progress
+              percent={percent}
+              size="small"
+              format={() => `${occupied}/${capacity}`}
+              status={percent > 90 ? 'exception' : 'normal'}
+            />
+          </div>
+        );
+      },
     },
     {
       title: 'Status',
       dataIndex: 'status',
       key: 'status',
       render: (status) => (
-        <Tag color={statusColors[status]}>{status?.toUpperCase().replace('-', ' ')}</Tag>
+        <Tag color={statusColors[status] || 'default'}>
+          {status?.toUpperCase().replace('-', ' ') || 'UNKNOWN'}
+        </Tag>
       ),
     },
     {
@@ -230,11 +247,32 @@ export default function TransportPage() {
         <Dropdown
           menu={{
             items: [
-              { key: 'view', icon: <EyeOutlined />, label: 'View Details' },
-              { key: 'edit', icon: <EditOutlined />, label: 'Edit' },
-              { key: 'track', icon: <EnvironmentOutlined />, label: 'Track Location' },
+              {
+                key: 'view',
+                icon: <EyeOutlined />,
+                label: 'View Details',
+                onClick: () => handleViewVehicle(record._id),
+              },
+              {
+                key: 'edit',
+                icon: <EditOutlined />,
+                label: 'Edit',
+                onClick: () => handleEditVehicle(record._id),
+              },
+              {
+                key: 'track',
+                icon: <EnvironmentOutlined />,
+                label: 'Track Location',
+                onClick: () => router.push(`/transport/vehicles/${record._id}/track`),
+              },
               { type: 'divider' },
-              { key: 'delete', icon: <DeleteOutlined />, label: 'Delete', danger: true },
+              {
+                key: 'delete',
+                icon: <DeleteOutlined />,
+                label: 'Delete',
+                danger: true,
+                onClick: () => handleDeleteVehicle(record._id),
+              },
             ],
           }}
           trigger={['click']}
@@ -257,9 +295,9 @@ export default function TransportPage() {
       key: 'journey',
       render: (_, record) => (
         <Space direction="vertical" size={0}>
-          <Text style={{ fontSize: 12 }}>{record.startPoint}</Text>
+          <Text style={{ fontSize: 12 }}>{record.startPoint || 'N/A'}</Text>
           <Text type="secondary">↓</Text>
-          <Text style={{ fontSize: 12 }}>{record.endPoint}</Text>
+          <Text style={{ fontSize: 12 }}>{record.endPoint || 'N/A'}</Text>
         </Space>
       ),
     },
@@ -268,9 +306,9 @@ export default function TransportPage() {
       key: 'details',
       render: (_, record) => (
         <Space split="•">
-          <span>{record.stops} stops</span>
-          <span>{record.distance}</span>
-          <span>{record.duration}</span>
+          <span>{record.stops?.length || 0} stops</span>
+          <span>{record.distance || 'N/A'}</span>
+          <span>{record.estimatedTime || 'N/A'}</span>
         </Space>
       ),
     },
@@ -278,26 +316,22 @@ export default function TransportPage() {
       title: 'Vehicle',
       dataIndex: 'assignedVehicle',
       key: 'vehicle',
-      render: (v) => <Tag icon={<CarOutlined />}>{v}</Tag>,
-    },
-    {
-      title: 'Students',
-      dataIndex: 'students',
-      key: 'students',
-      render: (s) => <Tag icon={<TeamOutlined />}>{s}</Tag>,
+      render: (v) => v ? <Tag icon={<CarOutlined />}>{v}</Tag> : <Text type="secondary">Not assigned</Text>,
     },
     {
       title: 'Monthly Fare',
-      dataIndex: 'fare',
+      dataIndex: 'monthlyFare',
       key: 'fare',
-      render: (f) => `Rs. ${f.toLocaleString()}`,
+      render: (f) => f ? `Rs. ${f.toLocaleString()}` : 'N/A',
     },
     {
       title: 'Status',
-      dataIndex: 'status',
+      dataIndex: 'isActive',
       key: 'status',
-      render: (status) => (
-        <Tag color={status === 'active' ? 'green' : 'orange'}>{status?.toUpperCase()}</Tag>
+      render: (isActive) => (
+        <Tag color={isActive !== false ? 'green' : 'orange'}>
+          {isActive !== false ? 'ACTIVE' : 'INACTIVE'}
+        </Tag>
       ),
     },
     {
@@ -307,9 +341,21 @@ export default function TransportPage() {
         <Dropdown
           menu={{
             items: [
-              { key: 'view', icon: <EyeOutlined />, label: 'View Stops' },
-              { key: 'edit', icon: <EditOutlined />, label: 'Edit Route' },
-              { key: 'students', icon: <TeamOutlined />, label: 'View Students' },
+              {
+                key: 'view',
+                icon: <EyeOutlined />,
+                label: 'View Stops',
+              },
+              {
+                key: 'edit',
+                icon: <EditOutlined />,
+                label: 'Edit Route',
+              },
+              {
+                key: 'students',
+                icon: <TeamOutlined />,
+                label: 'View Students',
+              },
             ],
           }}
           trigger={['click']}
@@ -331,6 +377,7 @@ export default function TransportPage() {
           loading={loading}
           onRefresh={fetchData}
           searchPlaceholder="Search by vehicle number, driver..."
+          rowKey="_id"
         />
       ),
     },
@@ -344,6 +391,7 @@ export default function TransportPage() {
           loading={loading}
           onRefresh={fetchData}
           searchPlaceholder="Search routes..."
+          rowKey="_id"
         />
       ),
     },
@@ -357,6 +405,13 @@ export default function TransportPage() {
         breadcrumbs={[{ title: 'Transport' }]}
         actions={
           <Space>
+            <Button
+              icon={<ReloadOutlined />}
+              onClick={fetchData}
+              loading={loading}
+            >
+              Refresh
+            </Button>
             <Button
               type="primary"
               icon={<PlusOutlined />}
@@ -440,4 +495,3 @@ export default function TransportPage() {
     </div>
   );
 }
-

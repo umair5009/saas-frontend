@@ -129,28 +129,6 @@ export default function LoginPage() {
           </Form.Item>
         </Form>
 
-        {/* Demo Credentials */}
-        <Divider plain style={{ margin: '24px 0' }}>
-          <Text type="secondary" style={{ fontSize: 12 }}>Demo Credentials</Text>
-        </Divider>
-
-        <Space direction="vertical" size="small" style={{ width: '100%' }}>
-          <div style={{
-            padding: '12px 16px',
-            borderRadius: 8,
-            fontSize: 13
-          }}>
-            <div><strong>Super Admin:</strong> admin@school.com / password123</div>
-          </div>
-          <div style={{
-            padding: '12px 16px',
-            borderRadius: 8,
-            fontSize: 13
-          }}>
-            <div><strong>Branch Admin:</strong> branch@school.com / password123</div>
-          </div>
-        </Space>
-
         {/* Footer */}
         <div style={{ textAlign: 'center', marginTop: 24 }}>
           <Text type="secondary" style={{ fontSize: 13 }}>
